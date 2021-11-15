@@ -1,0 +1,42 @@
+{
+  "name": "noxkiwi/dataabstraction",
+  "description": "",
+  "version": "1.0.0",
+  "type": "package",
+  "license": "proprietary",
+  "keywords": [
+    "Data",
+    "Abstraction",
+    "Layer",
+    "DAL",
+    "Data abstraction Layer",
+    "model"
+  ],
+  "homepage": "https://nox.kiwi/",
+  "time": "2020-05-26",
+  "authors": [
+    {
+      "name": "Jan Nox",
+      "email": "jan.nox@pm.me",
+      "homepage": "https://nox.kiwi",
+      "role": "Lead Developer"
+    }
+  ],
+  "require": {
+    "php": ">=8.0.0",
+    "noxkiwi/core": "*",
+    "noxkiwi/hook": "*",
+    "noxkiwi/cache": "*",
+    "noxkiwi/validator": "*",
+    "noxkiwi/singleton": "*",
+    "noxkiwi/database": "*"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^7"
+  },
+  "autoload": {
+    "psr-4": {
+      "noxkiwi\\dataabstraction\\": "backend/class/"
+    }
+  }
+}
