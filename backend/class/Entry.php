@@ -7,9 +7,11 @@ use noxkiwi\core\Exception\InvalidArgumentException;
 use noxkiwi\dataabstraction\Interfaces\EntryInterface;
 use noxkiwi\validator\Validator;
 use function array_key_exists;
+use function compact;
 use function is_array;
 use function strtoupper;
 use const E_USER_NOTICE;
+use const E_WARNING;
 
 /**
  * I am an arbitrary entry. Utilize me e.g. for Database entries
