@@ -134,9 +134,9 @@ abstract class Model extends Singleton implements ModelInterface
     private function makeConfig(): void
     {
         $cacheKey = strtoupper(str_replace('\\', '_', static::class));
-        $config   = $this->cacheInstance->get(static::CONFIG_CACHE, $cacheKey);
-        if (is_array($config)) {
-            $this->config = new Config($config);
+        $cache    = $this->cacheInstance->get(static::CONFIG_CACHE, $cacheKey);
+        if (is_array($cache)) {
+            $this->config = new Config($cache);
 
             return;
         }
