@@ -37,5 +37,7 @@ final class FieldDefinition
     public string $enum;
     /** @var array I am the options array for the validator configuration. */
     public array $validatorOptions;
+    /** @var mixed I am the value that will be pre-filled. */
+    public mixed $defaultValue;
 }
 
