@@ -2,6 +2,7 @@
 namespace noxkiwi\dataabstraction;
 
 use JetBrains\PhpStorm\Pure;
+use noxkiwi\core\Exception\InvalidArgumentException;
 use noxkiwi\core\Helper\JsonHelper;
 use noxkiwi\dataabstraction\Model\Plugin\Filter;
 use noxkiwi\dataabstraction\Model\Plugin\Limit;

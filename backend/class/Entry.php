@@ -154,6 +154,7 @@ class Entry implements EntryInterface
         }
         $this->changeField($fieldName, $fieldValue);
         $this->data[$fieldName] = $fieldValue;
+        $this->changeField($fieldName, $fieldValue);
     }
 
     /**
@@ -175,6 +176,21 @@ class Entry implements EntryInterface
     public function __set(string $fieldName, mixed $fieldValue): void
     {
         $this->setField($fieldName, $fieldValue);
+    }
+
+    /**
+     * I will set the given $name to the given $value by passing both into the setField method.
+     *
+     * @param string $name
+     * @param mixed $value
+     *
+     * @throws InvalidArgumentException
+     *
+     * @return void
+     */
+    public function __set(string $name, mixed $value): void
+    {
+        $this->setField($name, $value);
     }
 
     /**
