@@ -279,15 +279,15 @@ final class Slang
      *
      * @return \noxkiwi\database\Query
      */
-    public function insert(Model $model, array $saveData): Query
+    public function insert(Model $model, array $saveData, bool $forceMode = false): Query
     {
         $query         = new Query();
         $query->string = 'INSERT INTO';
         $query->attach($this->getQueryTable($model));
         $query->string .= ' ( ';
-        $query->string .= implode(', ', $this->removeReadonlyFields($model, $saveData, null, true));
+        $query->string .= implode(', ', $this->removeReadonlyFields($model, $saveData, null, true, $forceMode));
         $query->string .= ') VALUES (';
-        $query->string .= implode(', ', $this->removeReadonlyFields($model, $saveData, ':SETFIELD_'));
+        $query->string .= implode(', ', $this->removeReadonlyFields($model, $saveData, ':SETFIELD_', $forceMode));
         $query->string .= ' );';
         foreach ($this->removeReadonlyFields($model, $saveData) as $field) {
             if (is_object($saveData[$field]) || is_array($saveData[$field])) {

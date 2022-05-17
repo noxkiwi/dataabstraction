@@ -13,6 +13,7 @@ use noxkiwi\core\Exception\InvalidArgumentException;
 use noxkiwi\core\Exception\InvalidJsonException;
 use noxkiwi\core\Helper\JsonHelper;
 use noxkiwi\core\Traits\LanguageImprovementTrait;
+use noxkiwi\dataabstraction\Exception\EntryMissingException;
 use noxkiwi\dataabstraction\Exception\ModelException;
 use noxkiwi\dataabstraction\Interfaces\ModelInterface;
 use noxkiwi\dataabstraction\Model\Plugin\Field;
@@ -60,15 +61,15 @@ abstract class Model extends Singleton implements ModelInterface
 {
     use LanguageImprovementTrait;
 
-    private const   CONFIG_CACHE         = Cache::DEFAULT_PREFIX . 'MODELCONFIG';
-    public const    CACHE_DATA           = Cache::DEFAULT_PREFIX . 'MODELDATA_';
-    public const    TABLE                = '';
-    public const    SCHEMA               = 'public';
-    public const    CONST_MAX_LIMIT      = 10;
-    public const    FIELDSUFFIX_CREATED  = '_created';
-    public const    FIELDSUFFIX_MODIFIED = '_modified';
-    public const    FIELDSUFFIX_ID       = '_id';
-    public const    DB_TYPE              = 'null';
+    protected const   CONFIG_CACHE         = Cache::DEFAULT_PREFIX . 'MODELCONFIG';
+    public const      CACHE_DATA           = Cache::DEFAULT_PREFIX . 'MODELDATA_';
+    public const      TABLE                = '';
+    public const      SCHEMA               = 'public';
+    public const      CONST_MAX_LIMIT      = 10;
+    public const      FIELDSUFFIX_CREATED  = '_created';
+    public const      FIELDSUFFIX_MODIFIED = '_modified';
+    public const      FIELDSUFFIX_ID       = '_id';
+    public const      DB_TYPE              = 'null';
     /** @var \noxkiwi\dataabstraction\Entry[] */
     private static array  $entries;
     private static string $cacheGroup;
@@ -133,7 +134,7 @@ abstract class Model extends Singleton implements ModelInterface
     private function makeConfig(): void
     {
         $cacheKey = strtoupper(str_replace('\\', '_', static::class));
-        $config   = $this->cacheInstance->get(self::CONFIG_CACHE, $cacheKey);
+        $config   = $this->cacheInstance->get(static::CONFIG_CACHE, $cacheKey);
         if (is_array($config)) {
             $this->config = new Config($config);
 
@@ -142,11 +143,11 @@ abstract class Model extends Singleton implements ModelInterface
         $configFile = 'config/model/' . static::SCHEMA . '_' . static::TABLE . '.json';
         try {
             $this->config = new JsonConfig($configFile);
-            $this->cacheInstance->set(self::CONFIG_CACHE, $cacheKey, $this->config->get());
-            $errors = ModelValidator::getInstance()->validate($this->config->get());
+            $errors       = ModelValidator::getInstance()->validate($this->config->get());
         } catch (Exception $exception) {
             throw new ModelException($exception->getMessage(), E_ERROR, compact('configFile'));
         }
+        $this->cacheInstance->set(static::CONFIG_CACHE, $cacheKey, $this->config->get());
         if (! empty($errors)) {
             throw new ModelException('EXCEPTION_SETCONFIG_INVALIDMODELCONFIG', E_ERROR, $errors);
         }
@@ -159,7 +160,7 @@ abstract class Model extends Singleton implements ModelInterface
     final public function getEntries(): array
     {
         $return  = [];
-        $results = $this->getResult();
+        $results = $this->search();
         foreach ($results as $result) {
             $currentEntry = $this->getEntry();
             try {
@@ -318,6 +319,7 @@ abstract class Model extends Singleton implements ModelInterface
             $fieldDefinition->foreign          = (array)$this->getConfig()->get("fields>$fieldName>foreign");
             $fieldDefinition->enum             = (string)$this->getConfig()->get("fields>$fieldName>enum");
             $fieldDefinition->readonly         = (bool)$this->getConfig()->get("fields>$fieldName>readonly");
+            $fieldDefinition->defaultValue     = $this->getConfig()->get("fields>$fieldName>default", null);
             $fieldDefinition->validatorOptions = [];
             if ($fieldName === $this->getPrimarykey()) {
                 $fieldDefinition->readonly = true;
@@ -401,7 +403,7 @@ abstract class Model extends Singleton implements ModelInterface
      */
     final public function count(): int
     {
-        return count($this->search()->getResult());
+        return count($this->search());
     }
 
     /**
@@ -477,6 +479,13 @@ abstract class Model extends Singleton implements ModelInterface
         return $this->filters;
     }
 
+    /**
+     * I will overwrite the entire filters collection in this Model instance.
+     *
+     * @param array $filters
+     *
+     * @return void
+     */
     final public function setFilters(array $filters): void
     {
         $this->filters = $filters ?? [];
@@ -489,11 +498,11 @@ abstract class Model extends Singleton implements ModelInterface
      */
     final public function getCacheGroup(): string
     {
-        if (empty(self::$cacheGroup)) {
-            self::$cacheGroup = static::CACHE_DATA . strtoupper($this->getConnectionName() . '_' . str_replace('\\', '_', static::class));
+        if (empty(static::$cacheGroup)) {
+            static::$cacheGroup = static::CACHE_DATA . strtoupper($this->getConnectionName() . '_' . str_replace('\\', '_', static::class));
         }
 
-        return self::$cacheGroup;
+        return static::$cacheGroup;
     }
 
     /**
@@ -509,7 +518,6 @@ abstract class Model extends Singleton implements ModelInterface
         $this->models        = [];
         $this->limit         = null;
         $this->offset        = null;
-        $this->filters       = [];
         $this->flagFilters   = [];
         $this->cache         = false;
         $this->result        = null;
@@ -557,6 +565,25 @@ abstract class Model extends Singleton implements ModelInterface
     }
 
     /**
+     * @param string|int $primary
+     *
+     * @throws \noxkiwi\dataabstraction\Exception\EntryMissingException
+     * @throws \noxkiwi\singleton\Exception\SingletonException
+     * @return \noxkiwi\dataabstraction\Entry
+     */
+    final public static function expect(string|int $primary): Entry
+    {
+        $model = static::getInstance();
+        $entry = $model->loadEntry($primary);
+        if (empty($entry)) {
+            $object = static::class;
+            throw new EntryMissingException("$object $primary not found", E_ERROR);
+        }
+
+        return $entry;
+    }
+
+    /**
      * I will return the simple name of the given $primary key to make caching of entries possible.
      *
      * @param int|string $primaryKey
@@ -594,7 +621,7 @@ abstract class Model extends Singleton implements ModelInterface
         $this->setLimit(1);
         if ($field === $this->getPrimarykey()) {
             $cacheGroup = $this->getCacheGroup();
-            $cacheKey   = static::getPrimaryCacheKey($value);
+            $cacheKey   = static::getEntryName($value);
             $myData     = $this->cacheInstance->get($cacheGroup, $cacheKey);
             if (! is_array($myData) || empty($myData)) {
                 $myData = $this->search();
@@ -634,19 +661,6 @@ abstract class Model extends Singleton implements ModelInterface
         $this->filters[] = Filter::get($fieldName, $fieldType, $operator, $value);
     }
 
-    /**
-     * I will return the cacheKey for an ambigious entry identified by nothing but the primary key
-     *
-     *
-     * @param int|string $primaryKey
-     *
-     * @return string
-     */
-    final public static function getPrimaryCacheKey(int|string $primaryKey): string
-    {
-        return 'PRIMARY_' . $primaryKey;
-    }
-
     final public function useCache(bool $cache = true): void
     {
         $this->cache = $cache;
@@ -659,12 +673,13 @@ abstract class Model extends Singleton implements ModelInterface
     final public function delete(mixed $primaryKey = null): void
     {
         if ($primaryKey instanceof Entry) {
-            $primaryKey = $primaryKey->{$this->getPrimarykey()};
+            $primaryKey = $primaryKey->getField($this->getPrimarykey());
         }
         if (! empty($primaryKey)) {
+            $this->addFilter($this->getPrimarykey(), $primaryKey);
             $queryBuilder = $this->getSlang();
             $dbQuery      = $queryBuilder->delete($this, $this->getFilters());
-            $this->doQuery($dbQuery, DatabaseObserver::SELECT);
+            $this->doQuery($dbQuery, DatabaseObserver::DELETE);
 
             return;
         }
@@ -727,9 +742,10 @@ abstract class Model extends Singleton implements ModelInterface
             return;
         }
         $this->reset();
+        $data   = $this->normalizeData($data);
         $errors = $this->validate($data);
         if (! empty($errors)) {
-            throw new InvalidArgumentException('INVALID_ENTRY', E_USER_NOTICE, $errors);
+            throw new InvalidArgumentException('INVALID_ENTRY', E_USER_NOTICE, compact('errors', 'data'));
         }
         if (! empty($data[$this->getPrimarykey()])) {
             $data[$this->getPrimarykey()] = (string)$data[$this->getPrimarykey()];
@@ -808,7 +824,7 @@ abstract class Model extends Singleton implements ModelInterface
         $this->doQuery($updateQuery, DatabaseObserver::UPDATE);
         try {
             $cacheGroup = $this->getCacheGroup();
-            $cacheKey   = static::getPrimaryCacheKey($saveData[$this->getPrimarykey()]);
+            $cacheKey   = static::getEntryName($saveData[$this->getPrimarykey()]);
             $this->cacheInstance->clearKey($cacheGroup, $cacheKey);
         } catch (Exception $exception) {
             ErrorHandler::handleException($exception);
@@ -820,10 +836,10 @@ abstract class Model extends Singleton implements ModelInterface
      *
      * @param array $saveData
      */
-    final protected function insert(array $saveData): void
+    final public function insert(array $saveData, bool $forceMode = false): void
     {
         $slang       = $this->getSlang();
-        $insertQuery = $slang->insert($this, $saveData);
+        $insertQuery = $slang->insert($this, $saveData, $forceMode);
         $this->doQuery($insertQuery, DatabaseObserver::UPDATE);
     }
 
