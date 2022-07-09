@@ -479,6 +479,13 @@ abstract class Model extends Singleton implements ModelInterface
         return $this->filters;
     }
 
+    /**
+     * I will overwrite the entire filters collection in this Model instance.
+     *
+     * @param array $filters
+     *
+     * @return void
+     */
     final public function setFilters(array $filters): void
     {
         $this->filters = $filters ?? [];
@@ -511,7 +518,6 @@ abstract class Model extends Singleton implements ModelInterface
         $this->models        = [];
         $this->limit         = null;
         $this->offset        = null;
-        $this->filters       = [];
         $this->flagFilters   = [];
         $this->cache         = false;
         $this->result        = null;
@@ -736,9 +742,10 @@ abstract class Model extends Singleton implements ModelInterface
             return;
         }
         $this->reset();
+        $data   = $this->normalizeData($data);
         $errors = $this->validate($data);
         if (! empty($errors)) {
-            throw new InvalidArgumentException('INVALID_ENTRY', E_USER_NOTICE, $errors);
+            throw new InvalidArgumentException('INVALID_ENTRY', E_USER_NOTICE, compact('errors', 'data'));
         }
         if (! empty($data[$this->getPrimarykey()])) {
             $data[$this->getPrimarykey()] = (string)$data[$this->getPrimarykey()];

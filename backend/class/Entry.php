@@ -152,6 +152,7 @@ class Entry implements EntryInterface
             $error = compact('fieldName', 'fieldValue', 'errors');
             throw new InvalidArgumentException('EXCEPTION_INVALID_' . strtoupper($fieldName), E_WARNING, $error);
         }
+        $this->changeField($fieldName, $fieldValue);
         $this->data[$fieldName] = $fieldValue;
         $this->changeField($fieldName, $fieldValue);
     }
@@ -161,22 +162,20 @@ class Entry implements EntryInterface
      */
     final public function __get(string $fieldName): mixed
     {
-        return $this->data[$fieldName] ?? null;
+        return $this->getField($fieldName);
     }
 
     /**
-     * I will set the given $name to the given $value by passing both into the setField method.
+     * I will set the given $fieldValue to the specified $fieldName.
      *
-     * @param string $name
-     * @param mixed $value
+     * @param string $fieldName
+     * @param mixed  $fieldValue
      *
-     * @throws InvalidArgumentException
-     *
-     * @return void
+     * @throws \noxkiwi\core\Exception\InvalidArgumentException
      */
-    public function __set(string $name, mixed $value): void
+    public function __set(string $fieldName, mixed $fieldValue): void
     {
-        $this->setField($name, $value);
+        $this->setField($fieldName, $fieldValue);
     }
 
     /**
