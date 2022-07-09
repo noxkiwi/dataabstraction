@@ -179,21 +179,6 @@ class Entry implements EntryInterface
     }
 
     /**
-     * I will set the given $name to the given $value by passing both into the setField method.
-     *
-     * @param string $name
-     * @param mixed $value
-     *
-     * @throws InvalidArgumentException
-     *
-     * @return void
-     */
-    public function __set(string $name, mixed $value): void
-    {
-        $this->setField($name, $value);
-    }
-
-    /**
      * @inheritDoc
      */
     public function save(): void
