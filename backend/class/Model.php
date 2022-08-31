@@ -861,6 +861,16 @@ abstract class Model extends Singleton implements ModelInterface
     }
 
     /**
+     * I will solely return the list of previously added Model instances.
+     * @see \noxkiwi\dataabstraction\Model::addModel()
+     * @return \noxkiwi\dataabstraction\Model[]
+     */
+    final public function getModels(): array
+    {
+        return $this->models;
+    }
+
+    /**
      * @inheritDoc
      */
     final public function isFlag(int $flagValue, Entry|array|int $data): bool
