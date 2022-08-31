@@ -749,7 +749,7 @@ abstract class Model extends Singleton implements ModelInterface
     /**
      * I will return the list of fields that will be queried for.
      *
-     * @return \noxkiwi\dataabstraction\Model\Plugin\Field[]
+     * @return string[]
      */
     final public function getSelectFields(): array
     {

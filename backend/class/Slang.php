@@ -101,10 +101,9 @@ final class Slang
         $addon = new QueryAddon();
         $addon->data= [];
         foreach($joinedModels as $joinedModel) {
-            // Enforce an alias on the JOINed table!
             $joinedModel->setJoinAlias(uniqid());
             $addon->string .= <<<SQL
-JOIN    {$this->delimitTableName($joinedModel::TABLE)} AS `{$joinedModel->getTable()}` USING ( {$this->delimitTableName($joinedModel->getPrimarykey())})
+JOIN    {$this->delimitTableName($joinedModel::TABLE)} AS `{$joinedModel->getTable()}` USING ({$this->delimitTableName($joinedModel->getPrimarykey())})
 SQL;
         }
         $model->setModels($joinedModels);
@@ -139,22 +138,21 @@ SQL;
             $addon->string.=$joinedAddon->string;
             $addon->data  +=$joinedAddon->data;
         }
-        $index = 0;
         $table = $model->getTable();
         foreach ($model->getFilters() as $filter) {
-            $index++;
-            $addon->string .= "$operator `{$table}`.`{$filter->fieldName}` ";
+            $field = $filter->fieldName;
+            $addon->string .= "$operator `{$table}`.`{$field}` ";
             if (is_array($filter->getValue())) {
                 $values = [];
                 foreach ($filter->getValue() as $currrentValue) {
-                    $values[] = self::delimit($filter->fieldName, $currrentValue);
+                    $values[] = self::delimit($field, $currrentValue);
                 }
                 $string = implode(', ', $values);
                 $addon->string  .= ' IN ( ' . $string . ') ';
             } elseif (empty($filter->getValue()) || $filter->getValue() === 'null') {
                 $addon->string .= ' IS NULL ';
             } else {
-                $key=  "{$table}_FILTER_$index";
+                $key=  "{$table}_FILTER_$field";
                 $addon->data[$key] = $filter->getValue();
                 $addon->string    .= "{$filter->getOperatorString()} :$key";
             }
