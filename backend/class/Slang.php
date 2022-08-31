@@ -85,6 +85,28 @@ final class Slang
     }
 
     /**
+     * I will solely return the JOIN additions for the desired query.
+     *
+     * @param \noxkiwi\dataabstraction\Model $model
+     *
+     * @return \noxkiwi\database\QueryAddon|null
+     */
+    protected function getQueryJoins(Model $model): ?QueryAddon{
+        $joinedModels = $model->getModels();
+        if(empty($joinedModels)) {
+            return null;
+        }
+        $addon = new QueryAddon();
+        $addon->data= [];
+        foreach($joinedModels as $joinedModel) {
+            $addon->string .= <<<SQL
+JOIN    {$this->delimitTableName($joinedModel::TABLE)} USING( {$this->delimitTableName($joinedModel->getPrimarykey())})
+SQL;
+        }
+        return $addon;
+    }
+
+    /**
      * I will delimit the given $tableName.
      *
      * @param string $tableName
