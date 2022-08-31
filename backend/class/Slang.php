@@ -41,6 +41,10 @@ final class Slang
         $query->attach($this->getFieldList($model->getSelectFields()));
         $query->string .= ' FROM ';
         $query->attach($this->getQueryTable($model));
+        $joinAddon = $this->getQueryJoins($model);
+        if($joinAddon) {
+            $query->attach($joinAddon);
+        }
         $query->attach($this->getQueryFilter($model->getFilters(), ' AND '));
         $query->attach($this->getQueryOrder($model->getOrders()));
         $query->attach($this->getQueryLimit($model->getLimit(), $model->getOffset()));
