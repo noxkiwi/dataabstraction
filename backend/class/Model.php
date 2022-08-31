@@ -22,6 +22,7 @@ use noxkiwi\dataabstraction\Model\Plugin\Offset;
 use noxkiwi\dataabstraction\Model\Plugin\Order;
 use noxkiwi\dataabstraction\Validator\Structure\Config\ModelValidator;
 use noxkiwi\database\Database;
+use noxkiwi\database\Exception\DatabaseException;
 use noxkiwi\database\Observer\DatabaseObserver;
 use noxkiwi\database\Query;
 use noxkiwi\singleton\Singleton;
@@ -74,24 +75,18 @@ abstract class Model extends Singleton implements ModelInterface
     /** @var \noxkiwi\dataabstraction\Entry[] */
     private static array  $entries;
     private static string $cacheGroup;
-    /** @var string I am the filterOperator */
-    public string $filterOperator;
     /** @var bool Set to true if the query shall be cached after finishing. */
     protected bool $cache;
     /** @var array|null $result I am the result of the query that was executed. */
     protected ?array $result;
     /** @var \noxkiwi\dataabstraction\Model\Plugin\Field[] */
     protected array $fields;
-    /** @var string[] */
-    protected array $hiddenFields;
     /** @var \noxkiwi\dataabstraction\Model\Plugin\Limit|null I'll limit the output of the search result. */
     protected ?Limit $limit;
     /** @var \noxkiwi\dataabstraction\Model\Plugin\Offset|null I'll offset the output of the search result. */
     protected ?Offset $offset;
-    /** @var string I am the delimiter string. */
-    protected string $delimiter;
     /** @var \noxkiwi\dataabstraction\Model[] */
-    protected array $models;
+    private array $models;
     /** @var \noxkiwi\core\Config I am the Model's setup. */
     protected Config $config;
     /** @var \noxkiwi\dataabstraction\Model[] */
@@ -123,6 +118,7 @@ abstract class Model extends Singleton implements ModelInterface
         parent::__construct();
         $this->reset();
         $this->makeConfig();
+        $this->buildDefinitions();
     }
 
     /**
@@ -285,9 +281,16 @@ abstract class Model extends Singleton implements ModelInterface
     final public function getFieldType(string $fieldName): string
     {
         try {
-            return $this->getDefinition($fieldName)->type;
+            return $this->buildDefinition($fieldName)->type;
         } catch (Exception) {
             return '';
+        }
+    }
+
+    protected function buildDefinitions() : void
+    {
+        foreach(array_keys((array)$this->config->get("fields", [])) as $fieldName) {
+            $this->fieldDefinitions[$fieldName] = $this->buildDefinition($fieldName);
         }
     }
 
@@ -300,33 +303,29 @@ abstract class Model extends Singleton implements ModelInterface
      * @throws \noxkiwi\core\Exception\InvalidArgumentException
      * @return \noxkiwi\dataabstraction\FieldDefinition
      */
-    final public function getDefinition(string $fieldName): FieldDefinition
+    final public function buildDefinition(string $fieldName): FieldDefinition
     {
-        if (! isset($this->fieldDefinitions[$fieldName])) {
-            if (! $this->fieldExists($fieldName)) {
-                throw new InvalidArgumentException("Field $fieldName was not found!", E_ERROR);
-            }
-            $fieldDefinition                   = new FieldDefinition();
-            $fieldDefinition->name             = $fieldName;
-            $fieldDefinition->displayName      = (string)$this->getConfig()->get("fields>$fieldName>displayName");
-            $fieldDefinition->type             = (string)$this->getConfig()->get("fields>$fieldName>type");
-            $fieldDefinition->displayType      = (string)$this->getConfig()->get("fields>$fieldName>displayType", $fieldDefinition->type);
-            $fieldDefinition->required         = (bool)$this->getConfig()->get("fields>$fieldName>required");
-            $fieldDefinition->min              = (int)$this->getConfig()->get("fields>$fieldName>min");
-            $fieldDefinition->max              = (int)$this->getConfig()->get("fields>$fieldName>max");
-            $fieldDefinition->unique           = (bool)$this->getConfig()->get("fields>$fieldName>unique");
-            $fieldDefinition->foreign          = (array)$this->getConfig()->get("fields>$fieldName>foreign");
-            $fieldDefinition->enum             = (string)$this->getConfig()->get("fields>$fieldName>enum");
-            $fieldDefinition->readonly         = (bool)$this->getConfig()->get("fields>$fieldName>readonly");
-            $fieldDefinition->defaultValue     = $this->getConfig()->get("fields>$fieldName>default", null);
-            $fieldDefinition->validatorOptions = [];
-            if ($fieldName === $this->getPrimarykey()) {
-                $fieldDefinition->readonly = true;
-            }
-            $this->fieldDefinitions[$fieldName] = $fieldDefinition;
+        if (! $this->getConfig()->get("fields>$fieldName")) {
+            throw new InvalidArgumentException("Field $fieldName was not found!", E_ERROR);
         }
-
-        return $this->fieldDefinitions[$fieldName];
+        $fieldDefinition                   = new FieldDefinition();
+        $fieldDefinition->name             = $fieldName;
+        $fieldDefinition->displayName      = (string)$this->getConfig()->get("fields>$fieldName>displayName");
+        $fieldDefinition->type             = (string)$this->getConfig()->get("fields>$fieldName>type");
+        $fieldDefinition->displayType      = (string)$this->getConfig()->get("fields>$fieldName>displayType", $fieldDefinition->type);
+        $fieldDefinition->required         = (bool)$this->getConfig()->get("fields>$fieldName>required");
+        $fieldDefinition->min              = (int)$this->getConfig()->get("fields>$fieldName>min");
+        $fieldDefinition->max              = (int)$this->getConfig()->get("fields>$fieldName>max");
+        $fieldDefinition->unique           = (bool)$this->getConfig()->get("fields>$fieldName>unique");
+        $fieldDefinition->foreign          = (array)$this->getConfig()->get("fields>$fieldName>foreign");
+        $fieldDefinition->enum             = (string)$this->getConfig()->get("fields>$fieldName>enum");
+        $fieldDefinition->readonly         = (bool)$this->getConfig()->get("fields>$fieldName>readonly");
+        $fieldDefinition->defaultValue     = $this->getConfig()->get("fields>$fieldName>default", null);
+        $fieldDefinition->validatorOptions = [];
+        if ($fieldName === $this->getPrimarykey()) {
+            $fieldDefinition->readonly = true;
+        }
+        return $fieldDefinition;
     }
 
     /**
@@ -338,7 +337,7 @@ abstract class Model extends Singleton implements ModelInterface
      */
     public function fieldExists(string $fieldName): bool
     {
-        return in_array($fieldName, $this->getFieldNames(), false);
+        return array_key_exists($fieldName, $this->fieldDefinitions ?? []);
     }
 
     /**
@@ -348,11 +347,7 @@ abstract class Model extends Singleton implements ModelInterface
      */
     final public function getFieldNames(): array
     {
-        if (empty($this->fieldNames)) {
-            $this->fieldNames = array_keys($this->config->get('fields', []));
-        }
-
-        return $this->fieldNames;
+        return array_keys($this->config->get('fields', []));
     }
 
     /**
@@ -386,20 +381,30 @@ abstract class Model extends Singleton implements ModelInterface
     }
 
     /**
+     * I will solely return the list of FieldDefinitions in this instance.
+     *
      * @return \noxkiwi\dataabstraction\FieldDefinition[]
+     *
+     * @throws \noxkiwi\core\Exception\InvalidArgumentException In case the given $definition has the same name as a previously added Definition.
      */
     final public function getDefinitions(): array
     {
-        $definitions = [];
-        foreach ($this->getFieldNames() as $fieldName) {
-            try {
-                $definitions[$fieldName] = $this->getDefinition($fieldName);
-            } catch (InvalidArgumentException $exception) {
-                ErrorHandler::handleException($exception);
-            }
-        }
+        return $this->fieldDefinitions;
+    }
 
-        return $definitions;
+    /**
+     * I will solely take care that the given $definition is added to this instance.
+     *
+     * @param \noxkiwi\dataabstraction\FieldDefinition $definition
+     *
+     * @throws \noxkiwi\core\Exception\InvalidArgumentException In case the given $definition has the same name as a previously added Definition.
+     */
+    private function addDefinition(FieldDefinition $definition) :void
+    {
+        if( array_key_exists($definition->name, $this->fieldDefinitions)) {
+            throw new InvalidArgumentException("Field $definition->name is already known to this Model instance.", 42);
+        }
+        $this->fieldDefinitions[$definition->name] = $definition;
     }
 
     /**
@@ -419,6 +424,10 @@ abstract class Model extends Singleton implements ModelInterface
         $dbQuery      = $queryBuilder->search($this);
         $this->doQuery($dbQuery, DatabaseObserver::SELECT);
 
+        $result = $this->getResult();
+        if(empty($result)) {
+            throw new DatabaseException("NO RESULTS :((((((", 42);
+        }
         return $this->getResult();
     }
 
@@ -515,6 +524,7 @@ abstract class Model extends Singleton implements ModelInterface
     final protected function reset(): void
     {
         $this->setFilters([]);
+        $this->fieldDefinitions = [];
         $this->cacheInstance = Cache::getInstance();
         $this->order         = [];
         $this->fields        = [];
@@ -658,7 +668,7 @@ abstract class Model extends Singleton implements ModelInterface
             return;
         }
         if (! $this->fieldExists($fieldName)) {
-            return;
+            throw new InvalidArgumentException("Field $fieldName is unknown to this model instance.", 42);
         }
         $fieldType       = $this->getFieldType($fieldName);
         $this->filters[] = Filter::get($fieldName, $fieldType, $operator, $value);
@@ -858,6 +868,16 @@ abstract class Model extends Singleton implements ModelInterface
     final public function addModel(Model $model): void
     {
         $this->models[] = $model;
+        // Add the fields from the added model to create additional filters!
+        foreach($model->getDefinitions() as $fieldDefinition) {
+            if($this->fieldExists($fieldDefinition->name)) {
+                continue;
+            }
+            $this->fieldDefinitions[$fieldDefinition->name] = $fieldDefinition;
+        }
+        $model->getFieldNames();
+        // Enforce the fieldNameFCache to be MT
+        $this->fieldNames =[];
     }
 
     /**
