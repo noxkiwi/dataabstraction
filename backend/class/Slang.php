@@ -45,7 +45,7 @@ final class Slang
         if($joinAddon) {
             $query->attach($joinAddon);
         }
-        $query->attach($this->getQueryFilter($model->getFilters(), ' AND '));
+        $query->attach($this->getQueryFilter($model, ' AND ', true));
         $query->attach($this->getQueryOrder($model->getOrders()));
         $query->attach($this->getQueryLimit($model->getLimit(), $model->getOffset()));
 
@@ -82,7 +82,7 @@ final class Slang
     #[Pure] protected function getQueryTable(Model $model): QueryAddon
     {
         $addon         = new QueryAddon();
-        $addon->string = $this->delimitTableName($model::TABLE);
+        $addon->string = $this->delimitTableName($model->getTable());
         $addon->data   = [];
 
         return $addon;
@@ -103,10 +103,13 @@ final class Slang
         $addon = new QueryAddon();
         $addon->data= [];
         foreach($joinedModels as $joinedModel) {
+            // Enforce an alias on the JOINed table!
+            $joinedModel->setJoinAlias(uniqid());
             $addon->string .= <<<SQL
-JOIN    {$this->delimitTableName($joinedModel::TABLE)} USING( {$this->delimitTableName($joinedModel->getPrimarykey())})
+JOIN    {$this->delimitTableName($joinedModel::TABLE)} AS `{$joinedModel->getTable()}` USING ( {$this->delimitTableName($joinedModel->getPrimarykey())})
 SQL;
         }
+        $model->setModels($joinedModels);
         return $addon;
     }
 
@@ -123,37 +126,41 @@ SQL;
     }
 
     /**
-     * @param \noxkiwi\dataabstraction\Model\Plugin\Filter[] $filters
+     * @param \noxkiwi\dataabstraction\Model $model
      * @param string                                         $operator
      *
      * @return \noxkiwi\database\QueryAddon
      */
-    protected function getQueryFilter(array $filters, string $operator): QueryAddon
+    protected function getQueryFilter(Model $model, string $operator, bool $top = false): QueryAddon
     {
-        $where = ' WHERE TRUE ';
-        $data  = [];
+        $addon         = new QueryAddon();
+        $addon->string = $top ? ' WHERE TRUE ' : '';
+        $addon->data   = [];
+        foreach($model->getModels() as $joinedModel) {
+            $joinedAddon = $this->getQueryFilter($joinedModel, $operator);
+            $addon->string.=$joinedAddon->string;
+            $addon->data  +=$joinedAddon->data;
+        }
         $index = 0;
-        foreach ($filters as $filter) {
+        $table = $model->getTable();
+        foreach ($model->getFilters() as $filter) {
             $index++;
-            $where .= $operator;
+            $addon->string .= "$operator `{$table}`.`{$filter->fieldName}` ";
             if (is_array($filter->getValue())) {
                 $values = [];
                 foreach ($filter->getValue() as $currrentValue) {
-                    $values[] = self::delimit($filter->getFieldName(), $currrentValue);
+                    $values[] = self::delimit($filter->fieldName, $currrentValue);
                 }
                 $string = implode(', ', $values);
-                $where  .= $filter->getFieldName() . ' IN ( ' . $string . ') ';
+                $addon->string  .= ' IN ( ' . $string . ') ';
             } elseif (empty($filter->getValue()) || $filter->getValue() === 'null') {
-                $where .= $filter->getFieldName() . ' IS NULL ';
+                $addon->string .= ' IS NULL ';
             } else {
-                $data['filter_' . $index] = $filter->getValue();
-                $where                    .= $filter->getFieldName() . ' ' . $filter->getOperatorString() . ' :filter_' . $index . ' ';
+                $key=  "DA_{$table}_FILTER_$index";
+                $addon->data[$key] = $filter->getValue();
+                $addon->string                    .= $filter->getOperatorString() . ' :'.$key;
             }
         }
-        $addon         = new QueryAddon();
-        $addon->string = $where;
-        $addon->data   = $data;
-
         return $addon;
     }
 
@@ -273,7 +280,7 @@ SQL;
         $query->attach($this->getQueryTable($model));
         $query->string .= ' SET ';
         $query->attach($this->getQuerySet($model, $saveData));
-        $query->attach($this->getQueryFilter([$primaryFilter], ' AND '));
+        $query->attach($this->getQueryFilter($model, ' AND '));
 
         return $query;
     }
@@ -293,7 +300,7 @@ SQL;
         $index       = 0;
         $fields      = $model->getConfig()->get('fields');
         foreach ($fields as $fieldName => $field) {
-            if (in_array($fieldName, [$model->getPrimarykey(), $model::TABLE . Model::FIELDSUFFIX_MODIFIED, $model::TABLE . Model::FIELDSUFFIX_CREATED], true)) {
+            if (in_array($fieldName, [$model->getPrimarykey(), $model->getTable() . Model::FIELDSUFFIX_MODIFIED, $model->getTable() . Model::FIELDSUFFIX_CREATED], true)) {
                 continue;
             }
             if (! array_key_exists($fieldName, $data)) {
@@ -400,7 +407,7 @@ SQL;
         $query         = new Query();
         $query->string = 'DELETE FROM';
         $query->attach($this->getQueryTable($model));
-        $query->attach($this->getQueryFilter($filters, ' AND '));
+        $query->attach($this->getQueryFilter($model, ' AND '));
 
         return $query;
     }

@@ -17,6 +17,9 @@ use noxkiwi\dataabstraction\Exception\ModelException;
 use noxkiwi\dataabstraction\Interfaces\ModelInterface;
 use noxkiwi\dataabstraction\Model\Plugin\Field;
 use noxkiwi\dataabstraction\Model\Plugin\Filter;
+use noxkiwi\dataabstraction\Model\Plugin\Filter\DateFilter;
+use noxkiwi\dataabstraction\Model\Plugin\Filter\NumberFilter;
+use noxkiwi\dataabstraction\Model\Plugin\Filter\TextFilter;
 use noxkiwi\dataabstraction\Model\Plugin\Limit;
 use noxkiwi\dataabstraction\Model\Plugin\Offset;
 use noxkiwi\dataabstraction\Model\Plugin\Order;
@@ -671,7 +674,24 @@ abstract class Model extends Singleton implements ModelInterface
             throw new InvalidArgumentException("Field $fieldName is unknown to this model instance.", 42);
         }
         $fieldType       = $this->getFieldType($fieldName);
-        $this->filters[] = Filter::get($fieldName, $fieldType, $operator, $value);
+
+        if (str_starts_with($fieldType, Type::NUMBER)) {
+            $filter = new NumberFilter();
+        }
+        elseif (str_starts_with($fieldType, Type::DATE)) {
+            $filter = new DateFilter();
+        }
+        else {
+            $filter = new TextFilter();
+        }
+
+        $filter->fieldName = $fieldName;
+        $filter->operator = $operator;
+        $filter->model = $this;
+        $filter->value = $value;
+
+
+        $this->filters[] = $filter;
     }
 
     /**
@@ -862,6 +882,9 @@ abstract class Model extends Singleton implements ModelInterface
         $this->doQuery($insertQuery, DatabaseObserver::UPDATE);
     }
 
+    private string $joinAlias;
+    final public function setJoinAlias(string $joinAlias):void{$this->joinAlias=$joinAlias;}
+
     /**
      * @inheritDoc
      */
@@ -869,15 +892,12 @@ abstract class Model extends Singleton implements ModelInterface
     {
         $this->models[] = $model;
         // Add the fields from the added model to create additional filters!
-        foreach($model->getDefinitions() as $fieldDefinition) {
-            if($this->fieldExists($fieldDefinition->name)) {
-                continue;
-            }
-            $this->fieldDefinitions[$fieldDefinition->name] = $fieldDefinition;
-        }
-        $model->getFieldNames();
-        // Enforce the fieldNameFCache to be MT
-        $this->fieldNames =[];
+
+    }
+
+    final public function getTable():string
+    {
+        return $this->joinAlias ?? static::TABLE;
     }
 
     /**
@@ -889,6 +909,11 @@ abstract class Model extends Singleton implements ModelInterface
     {
         return $this->models;
     }
+
+    /**
+     * @param \noxkiwi\dataabstraction\Model[] $models
+     */
+    final public function setModels(array $models):void{$this->models = $models;}
 
     /**
      * @inheritDoc
