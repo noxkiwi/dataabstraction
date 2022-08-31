@@ -4,8 +4,6 @@ namespace noxkiwi\dataabstraction;
 use JetBrains\PhpStorm\Pure;
 use noxkiwi\core\Helper\JsonHelper;
 use noxkiwi\dataabstraction\Model\Plugin\Filter;
-use noxkiwi\dataabstraction\Model\Plugin\Limit;
-use noxkiwi\dataabstraction\Model\Plugin\Offset;
 use noxkiwi\database\Query;
 use noxkiwi\database\QueryAddon;
 use function array_key_exists;
@@ -53,7 +51,7 @@ final class Slang
     }
 
     /**
-     * @param \noxkiwi\dataabstraction\Model\Plugin\Field[] $fields
+     * @param string[] $fields
      *
      * @return \noxkiwi\database\QueryAddon
      */
@@ -63,7 +61,7 @@ final class Slang
         if (! empty($fields)) {
             $nFields = [];
             foreach ($fields as $field) {
-                $nFields[] = $field->fieldName;
+                $nFields[] = $field;
             }
             $queryFields = implode(',', $nFields);
         }
@@ -156,9 +154,9 @@ SQL;
             } elseif (empty($filter->getValue()) || $filter->getValue() === 'null') {
                 $addon->string .= ' IS NULL ';
             } else {
-                $key=  "DA_{$table}_FILTER_$index";
+                $key=  "{$table}_FILTER_$index";
                 $addon->data[$key] = $filter->getValue();
-                $addon->string                    .= $filter->getOperatorString() . ' :'.$key;
+                $addon->string    .= "{$filter->getOperatorString()} :$key";
             }
         }
         return $addon;
@@ -218,12 +216,12 @@ SQL;
     /**
      * I will return the limitation area of the query containing limit and offset
      *
-     * @param \noxkiwi\dataabstraction\Model\Plugin\Limit|null  $limit
-     * @param \noxkiwi\dataabstraction\Model\Plugin\Offset|null $offset
+     * @param int|null  $limit
+     * @param int|null $offset
      *
      * @return       \noxkiwi\database\QueryAddon
      */
-    #[Pure] protected function getQueryLimit(Limit $limit = null, Offset $offset = null): QueryAddon
+    #[Pure] protected function getQueryLimit(int $limit = null, int $offset = null): QueryAddon
     {
         $qA = new QueryAddon();
         if ($limit !== null) {
@@ -237,28 +235,28 @@ SQL;
     }
 
     /**
-     * @param \noxkiwi\dataabstraction\Model\Plugin\Limit $limit
+     * @param int $limit
      *
      * @return string
      */
-    protected function getLimit(Limit $limit): string
+    protected function getLimit(int $limit): string
     {
-        if ($limit->limit > 0) {
-            return " LIMIT $limit->limit ";
+        if ($limit > 0) {
+            return " LIMIT $limit ";
         }
 
         return '';
     }
 
     /**
-     * @param \noxkiwi\dataabstraction\Model\Plugin\Offset $offset
+     * @param int $offset
      *
      * @return string
      */
-    protected function getOffset(Offset $offset): string
+    protected function getOffset(int $offset): string
     {
-        if ($offset->offset > 0) {
-            return " OFFSET $offset->offset ";
+        if ($offset > 0) {
+            return " OFFSET $offset ";
         }
 
         return '';

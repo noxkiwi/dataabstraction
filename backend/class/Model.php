@@ -15,13 +15,9 @@ use noxkiwi\core\Traits\LanguageImprovementTrait;
 use noxkiwi\dataabstraction\Exception\EntryMissingException;
 use noxkiwi\dataabstraction\Exception\ModelException;
 use noxkiwi\dataabstraction\Interfaces\ModelInterface;
-use noxkiwi\dataabstraction\Model\Plugin\Field;
-use noxkiwi\dataabstraction\Model\Plugin\Filter;
 use noxkiwi\dataabstraction\Model\Plugin\Filter\DateFilter;
 use noxkiwi\dataabstraction\Model\Plugin\Filter\NumberFilter;
 use noxkiwi\dataabstraction\Model\Plugin\Filter\TextFilter;
-use noxkiwi\dataabstraction\Model\Plugin\Limit;
-use noxkiwi\dataabstraction\Model\Plugin\Offset;
 use noxkiwi\dataabstraction\Model\Plugin\Order;
 use noxkiwi\dataabstraction\Validator\Structure\Config\ModelValidator;
 use noxkiwi\database\Database;
@@ -46,6 +42,7 @@ use function str_contains;
 use function str_replace;
 use function strtolower;
 use function strtoupper;
+use function max;
 use function trim;
 use const E_ERROR;
 use const E_USER_NOTICE;
@@ -82,12 +79,12 @@ abstract class Model extends Singleton implements ModelInterface
     protected bool $cache;
     /** @var array|null $result I am the result of the query that was executed. */
     protected ?array $result;
-    /** @var \noxkiwi\dataabstraction\Model\Plugin\Field[] */
+    /** @var string[] */
     protected array $fields;
-    /** @var \noxkiwi\dataabstraction\Model\Plugin\Limit|null I'll limit the output of the search result. */
-    protected ?Limit $limit;
-    /** @var \noxkiwi\dataabstraction\Model\Plugin\Offset|null I'll offset the output of the search result. */
-    protected ?Offset $offset;
+    /** @var int I'll limit the output of the search result. */
+    protected int $limit;
+    /** @var int I'll offset the output of the search result. */
+    protected int $offset;
     /** @var \noxkiwi\dataabstraction\Model[] */
     private array $models;
     /** @var \noxkiwi\core\Config I am the Model's setup. */
@@ -532,8 +529,8 @@ abstract class Model extends Singleton implements ModelInterface
         $this->order         = [];
         $this->fields        = [];
         $this->models        = [];
-        $this->limit         = null;
-        $this->offset        = null;
+        $this->limit         = 0;
+        $this->offset        = 0;
         $this->flagFilters   = [];
         $this->cache         = false;
         $this->result        = null;
@@ -746,7 +743,7 @@ abstract class Model extends Singleton implements ModelInterface
         if (! $this->fieldExists($fieldName)) {
             return;
         }
-        $this->fields[] = new Field($fieldName);
+        $this->fields[] = $fieldName;
     }
 
     /**
@@ -1065,9 +1062,9 @@ abstract class Model extends Singleton implements ModelInterface
 
     /**
      * I will return the Limit count for the next search.
-     * @return \noxkiwi\dataabstraction\Model\Plugin\Limit|null
+     * @return int
      */
-    final public function getLimit(): ?Limit
+    final public function getLimit(): int
     {
         return $this->limit;
     }
@@ -1077,8 +1074,10 @@ abstract class Model extends Singleton implements ModelInterface
      */
     final public function setLimit(int $limit): void
     {
-        $this->limit = new Limit(min($limit, static::CONST_MAX_LIMIT));
+        $this->limit = min(self::MAX_LIMIT, max(1, $limit));
     }
+
+    protected const MAX_LIMIT = 500;
 
     /**
      * @inheritDoc
@@ -1089,9 +1088,9 @@ abstract class Model extends Singleton implements ModelInterface
 
     /**
      * I will return the Offset count for the next search.
-     * @return \noxkiwi\dataabstraction\Model\Plugin\Offset|null
+     * @return int
      */
-    final public function getOffset(): ?Offset
+    final public function getOffset(): int
     {
         return $this->offset;
     }
@@ -1101,6 +1100,6 @@ abstract class Model extends Singleton implements ModelInterface
      */
     final public function setOffset(int $offset): void
     {
-        $this->offset = new Offset($offset);
+        $this->offset = $offset;
     }
 }
