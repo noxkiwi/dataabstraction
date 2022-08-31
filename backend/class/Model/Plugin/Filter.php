@@ -104,6 +104,9 @@ abstract class Filter
         $this->value = $value;
     }
 
+    /**
+     * @return void
+     */
     final protected function injectMask(): void
     {
         switch ($this->getOperator()) {

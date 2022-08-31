@@ -1,15 +1,14 @@
 <?php declare(strict_types = 1);
 namespace noxkiwi\dataabstraction;
 
-use Exception;
-use JetBrains\PhpStorm\Pure;
 use noxkiwi\core\Exception\InvalidArgumentException;
 use noxkiwi\dataabstraction\Interfaces\EntryInterface;
 use noxkiwi\validator\Validator;
-use function array_key_exists;
+use function compact;
 use function is_array;
 use function strtoupper;
 use const E_USER_NOTICE;
+use const E_WARNING;
 
 /**
  * I am an arbitrary entry. Utilize me e.g. for Database entries
@@ -22,7 +21,7 @@ use const E_USER_NOTICE;
  * @version      1.1.3
  * @link         https://nox.kiwi/
  */
-final class Entry implements EntryInterface
+class Entry implements EntryInterface
 {
     /** @var array I am the data array of the Entry. */
     private array $data;
@@ -32,25 +31,16 @@ final class Entry implements EntryInterface
     private ?array $changedFields;
 
     /**
-     * I will construct the class instance and set some data
+     * I will construct the class instance and set some data,
+     * $data must only be used from a Model to create an entry without validation upfront.
      *
      * @param \noxkiwi\dataabstraction\Model $model
      * @param array                          $data
      */
     public function __construct(Model $model, array $data = [])
     {
-        $this->data          = [];
+        $this->data          = $data;
         $this->model         = $model;
-        $this->changedFields = null;
-        foreach ($this->getModel()->getDefinitions() as $fieldDefinition) {
-            if (! array_key_exists($fieldDefinition->name, $data)) {
-                continue;
-            }
-            try {
-                $this->setField($fieldDefinition->name, $data[$fieldDefinition->name]);
-            } catch (Exception) {
-            }
-        }
         $this->changedFields = [];
     }
 
@@ -155,7 +145,6 @@ final class Entry implements EntryInterface
         if (($this->data[$fieldName] ?? null) == $fieldValue) {
             return;
         }
-        $this->changeField($fieldName, $fieldValue);
         $definition = $this->getModel()->getDefinition($fieldName);
         $validator  = Validator::get($definition->type);
         $errors     = $validator->validate($fieldValue, [Validator::OPTION_NULL_ALLOWED => ! $definition->required]);
@@ -163,7 +152,9 @@ final class Entry implements EntryInterface
             $error = compact('fieldName', 'fieldValue', 'errors');
             throw new InvalidArgumentException('EXCEPTION_INVALID_' . strtoupper($fieldName), E_WARNING, $error);
         }
+        $this->changeField($fieldName, $fieldValue);
         $this->data[$fieldName] = $fieldValue;
+        $this->changeField($fieldName, $fieldValue);
     }
 
     /**
@@ -171,7 +162,20 @@ final class Entry implements EntryInterface
      */
     final public function __get(string $fieldName): mixed
     {
-        return $this->data[$fieldName] ?? null;
+        return $this->getField($fieldName);
+    }
+
+    /**
+     * I will set the given $fieldValue to the specified $fieldName.
+     *
+     * @param string $fieldName
+     * @param mixed  $fieldValue
+     *
+     * @throws \noxkiwi\core\Exception\InvalidArgumentException
+     */
+    public function __set(string $fieldName, mixed $fieldValue): void
+    {
+        $this->setField($fieldName, $fieldValue);
     }
 
     /**

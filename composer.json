@@ -3,7 +3,7 @@
   "description": "",
   "version": "1.0.0",
   "type": "package",
-  "license": "proprietary",
+  "license": "GPL-3.0-or-later",
   "keywords": [
     "Data",
     "Abstraction",
@@ -24,12 +24,12 @@
   ],
   "require": {
     "php": ">=8.0.0",
-    "noxkiwi/core": "*",
-    "noxkiwi/hook": "*",
-    "noxkiwi/cache": "*",
-    "noxkiwi/validator": "*",
-    "noxkiwi/singleton": "*",
-    "noxkiwi/database": "*"
+    "noxkiwi/core": "dev-master",
+    "noxkiwi/hook": "dev-master",
+    "noxkiwi/cache": "dev-master",
+    "noxkiwi/validator": "dev-master",
+    "noxkiwi/singleton": "dev-master",
+    "noxkiwi/database": "dev-master"
   },
   "require-dev": {
     "phpunit/phpunit": "^7"
