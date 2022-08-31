@@ -20,5 +20,9 @@ class ModelorderValidator extends StructureValidator
     /**
      * @inheritDoc
      */
-    protected array $structureDesign = ['field' => 'text_modelfield', 'direction' => 'text'];
+    protected function __construct(array $options = null)
+    {
+        parent::__construct($options);
+        $this->structureDesign = ['field' => 'text_modelfield', 'direction' => 'text'];
+    }
 }

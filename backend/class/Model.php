@@ -8,7 +8,6 @@ use noxkiwi\cache\Cache;
 use noxkiwi\core\Config;
 use noxkiwi\core\Config\JsonConfig;
 use noxkiwi\core\ErrorHandler;
-use noxkiwi\core\ErrorStack;
 use noxkiwi\core\Exception\InvalidArgumentException;
 use noxkiwi\core\Exception\InvalidJsonException;
 use noxkiwi\core\Helper\JsonHelper;
@@ -46,6 +45,7 @@ use function strtoupper;
 use function trim;
 use const E_ERROR;
 use const E_USER_NOTICE;
+use noxkiwi\core\Traits\ErrorManagerTrait;
 
 /**
  * I am the basic Model.
@@ -60,6 +60,7 @@ use const E_USER_NOTICE;
 abstract class Model extends Singleton implements ModelInterface
 {
     use LanguageImprovementTrait;
+    use ErrorManagerTrait;
 
     protected const   CONFIG_CACHE         = Cache::DEFAULT_PREFIX . 'MODELCONFIG';
     public const      CACHE_DATA           = Cache::DEFAULT_PREFIX . 'MODELDATA_';
@@ -89,8 +90,6 @@ abstract class Model extends Singleton implements ModelInterface
     protected ?Offset $offset;
     /** @var string I am the delimiter string. */
     protected string $delimiter;
-    /** @var \noxkiwi\core\Errorstack I am a Stack of errors. */
-    protected ErrorStack $errorStack;
     /** @var \noxkiwi\dataabstraction\Model[] */
     protected array $models;
     /** @var \noxkiwi\core\Config I am the Model's setup. */
@@ -133,10 +132,10 @@ abstract class Model extends Singleton implements ModelInterface
      */
     private function makeConfig(): void
     {
-        $cacheKey     = strtoupper(str_replace('\\', '_', static::class));
-        $cachedConfig = $this->cacheInstance->get(static::CONFIG_CACHE, $cacheKey);
-        if (is_array($cachedConfig)) {
-            $this->config = new Config($cachedConfig);
+        $cacheKey = strtoupper(str_replace('\\', '_', static::class));
+        $config   = $this->cacheInstance->get(static::CONFIG_CACHE, $cacheKey);
+        if (is_array($config)) {
+            $this->config = new Config($config);
 
             return;
         }
@@ -376,7 +375,12 @@ abstract class Model extends Singleton implements ModelInterface
         return $this->primaryKey;
     }
 
-    final public function getEntry(array $entryData = []): Entry
+    /**
+     * @param array $entryData
+     *
+     * @return \noxkiwi\dataabstraction\Entry
+     */
+    #[Pure] final public function getEntry(array $entryData = []): Entry
     {
         return new Entry($this, $entryData);
     }
@@ -512,7 +516,6 @@ abstract class Model extends Singleton implements ModelInterface
     {
         $this->setFilters([]);
         $this->cacheInstance = Cache::getInstance();
-        $this->errorStack    = ErrorStack::getErrorStack('MODEL');
         $this->order         = [];
         $this->fields        = [];
         $this->models        = [];
@@ -661,6 +664,11 @@ abstract class Model extends Singleton implements ModelInterface
         $this->filters[] = Filter::get($fieldName, $fieldType, $operator, $value);
     }
 
+    /**
+     * @param bool $cache
+     *
+     * @return void
+     */
     final public function useCache(bool $cache = true): void
     {
         $this->cache = $cache;
@@ -773,7 +781,7 @@ abstract class Model extends Singleton implements ModelInterface
             $this->validateField($fieldDefinition, $data[$fieldDefinition->name] ?? null);
         }
 
-        return $this->errorStack->getAll();
+        return $this->getErrors();
     }
 
     /**
@@ -786,16 +794,16 @@ abstract class Model extends Singleton implements ModelInterface
     {
         if (self::isEmpty($value)) {
             if ($this->isRequired($fieldDefinition->name)) {
-                $this->errorStack->addError('FIELD_IS_REQUIRED', $this->config->get('required', []));
+                $this->addError('FIELD_IS_REQUIRED', $this->config->get('required', []));
 
                 return;
             }
 
             return;
         }
-        $errors = Validator::get($fieldDefinition->type)->validate($value, $fieldDefinition->validatorOptions);
+        $errors = Validator::get($fieldDefinition->type)->validate($value);
         if (! empty($errors)) {
-            $this->errorStack->addError("INVALID_$fieldDefinition->name", $errors);
+            $this->addError("INVALID_$fieldDefinition->name", $errors);
         }
     }
 
@@ -824,7 +832,7 @@ abstract class Model extends Singleton implements ModelInterface
         $this->doQuery($updateQuery, DatabaseObserver::UPDATE);
         try {
             $cacheGroup = $this->getCacheGroup();
-            $cacheKey   = static::getEntryName($saveData[$this->getPrimarykey()]);
+            $cacheKey   = $this->getEntryName($saveData[$this->getPrimarykey()]);
             $this->cacheInstance->clearKey($cacheGroup, $cacheKey);
         } catch (Exception $exception) {
             ErrorHandler::handleException($exception);
@@ -835,6 +843,7 @@ abstract class Model extends Singleton implements ModelInterface
      * I will insert a new entry on the underlying Database class with the given $saveData.
      *
      * @param array $saveData
+     * @param bool  $forceMode
      */
     final public function insert(array $saveData, bool $forceMode = false): void
     {
@@ -999,6 +1008,10 @@ abstract class Model extends Singleton implements ModelInterface
         return $this->order;
     }
 
+    /**
+     * I will return the Limit count for the next search.
+     * @return \noxkiwi\dataabstraction\Model\Plugin\Limit|null
+     */
     final public function getLimit(): ?Limit
     {
         return $this->limit;
@@ -1019,6 +1032,10 @@ abstract class Model extends Singleton implements ModelInterface
     {
     }
 
+    /**
+     * I will return the Offset count for the next search.
+     * @return \noxkiwi\dataabstraction\Model\Plugin\Offset|null
+     */
     final public function getOffset(): ?Offset
     {
         return $this->offset;

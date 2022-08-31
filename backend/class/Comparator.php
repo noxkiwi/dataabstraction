@@ -41,17 +41,19 @@ final class Comparator
     ];
 
     /**
-     * I will return the real comparator string that is passed as $comparator.
-     * If it is not defined, I will return NULL.
+     * I will return the valid comparator constant of the given $comparator.
+     *
      * @param string $comparator
+     *
      * @return string|null
      */
     public static function get(string $comparator): ?string
     {
         $comparator = strtolower($comparator);
-        if(in_array($comparator, self::ALL, true)) {
+        if (in_array($comparator, self::ALL, true)) {
             return $comparator;
         }
+
         return null;
     }
 }

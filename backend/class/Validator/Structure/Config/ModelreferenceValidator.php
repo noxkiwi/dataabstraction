@@ -20,5 +20,9 @@ class ModelreferenceValidator extends ConfigValidator
     /**
      * @inheritDoc
      */
-    protected array $structureDesign = ['model' => 'text_modelname', 'key' => 'text_modelfield', 'display' => 'text'];
+    protected function __construct(array $options = null)
+    {
+        parent::__construct($options);
+        $this->structureDesign = ['model' => 'text_modelname', 'key' => 'text_modelfield', 'display' => 'text'];
+    }
 }
