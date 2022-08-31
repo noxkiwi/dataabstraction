@@ -2,7 +2,6 @@
 namespace noxkiwi\dataabstraction;
 
 use JetBrains\PhpStorm\Pure;
-use noxkiwi\core\Exception\InvalidArgumentException;
 use noxkiwi\core\Helper\JsonHelper;
 use noxkiwi\dataabstraction\Model\Plugin\Filter;
 use noxkiwi\dataabstraction\Model\Plugin\Limit;
@@ -71,6 +70,11 @@ final class Slang
         return $addon;
     }
 
+    /**
+     * @param \noxkiwi\dataabstraction\Model $model
+     *
+     * @return \noxkiwi\database\QueryAddon
+     */
     #[Pure] protected function getQueryTable(Model $model): QueryAddon
     {
         $addon         = new QueryAddon();
@@ -160,6 +164,11 @@ final class Slang
         return $qAddon;
     }
 
+    /**
+     * @param array $orders
+     *
+     * @return string
+     */
     protected function getOrders(array $orders): string
     {
         $order         = '';
@@ -194,6 +203,11 @@ final class Slang
         return $qA;
     }
 
+    /**
+     * @param \noxkiwi\dataabstraction\Model\Plugin\Limit $limit
+     *
+     * @return string
+     */
     protected function getLimit(Limit $limit): string
     {
         if ($limit->limit > 0) {
@@ -203,6 +217,11 @@ final class Slang
         return '';
     }
 
+    /**
+     * @param \noxkiwi\dataabstraction\Model\Plugin\Offset $offset
+     *
+     * @return string
+     */
     protected function getOffset(Offset $offset): string
     {
         if ($offset->offset > 0) {
