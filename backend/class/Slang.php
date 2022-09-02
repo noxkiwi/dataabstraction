@@ -44,7 +44,7 @@ final class Slang
             $query->attach($joinAddon);
         }
         $query->attach($this->getQueryFilter($model, ' AND ', true));
-        $query->attach($this->getQueryOrder($model->getOrders()));
+        $query->attach($this->getQueryOrder($model, true));
         $query->attach($this->getQueryLimit($model->getLimit(), $model->getOffset()));
 
         return $query;
@@ -125,6 +125,7 @@ SQL;
     /**
      * @param \noxkiwi\dataabstraction\Model $model
      * @param string                                         $operator
+     * @param bool $top
      *
      * @return \noxkiwi\database\QueryAddon
      */
@@ -141,11 +142,11 @@ SQL;
         $table = $model->getTable();
         foreach ($model->getFilters() as $filter) {
             $field = $filter->fieldName;
-            $addon->string .= "$operator `{$table}`.`{$field}` ";
+            $addon->string .=chr(10). "$operator `{$table}`.`{$field}` ";
             if (is_array($filter->getValue())) {
                 $values = [];
-                foreach ($filter->getValue() as $currrentValue) {
-                    $values[] = self::delimit($field, $currrentValue);
+                foreach ($filter->getValue() as $currentValue) {
+                    $values[] = self::delimit($field, $currentValue);
                 }
                 $string = implode(', ', $values);
                 $addon->string  .= ' IN ( ' . $string . ') ';
@@ -176,21 +177,29 @@ SQL;
     /**
      * I will return the order statements of this query
      *
-     * @param \noxkiwi\dataabstraction\Model\Plugin\Order[] $orders
+     * @param \noxkiwi\dataabstraction\Model $orders
+     * @param bool $top
      *
      * @return       \noxkiwi\database\QueryAddon
      */
-    #[Pure] protected function getQueryOrder(array $orders): QueryAddon
+    #[Pure] protected function getQueryOrder(Model $model, bool $top = false): QueryAddon
     {
-        $query = '';
-        if (! empty($orders)) {
-            $query = $this->getOrders($orders);
+        $addon         = new QueryAddon();
+        $addon->string = $top ? ' ORDER BY ' : '';
+        $addon->data   = [];
+        $comma = '';
+        foreach($model->getModels() as $joinedModel) {
+            $joinedAddon = $this->getQueryOrder($joinedModel);
+            $addon->string.="$comma $joinedAddon->string";
+            $addon->data  +=$joinedAddon->data;
+            $comma = ', ';
         }
-        $qAddon         = new QueryAddon();
-        $qAddon->data   = [];
-        $qAddon->string = $query;
+        if (empty($model->getOrders())) {
+            return $addon;
+        }
+        $addon->string .= $comma.$this->getOrders($model);
 
-        return $qAddon;
+        return $addon;
     }
 
     /**
@@ -198,14 +207,14 @@ SQL;
      *
      * @return string
      */
-    protected function getOrders(array $orders): string
+    protected function getOrders(Model $model): string
     {
         $order         = '';
-        $appliedOrders = 0;
-        foreach ($orders as $myOrder) {
-            $order .= $appliedOrders > 0 ? ', ' : ' ORDER BY ';
-            $order .= $myOrder->fieldName . ' ' . $myOrder->direction . ' ';
-            $appliedOrders++;
+        $appliedOrders = false;
+        foreach ($model->getOrders() as $myOrder) {
+            $order .= $appliedOrders ? ', ' : '';
+            $order .= chr(10)." `{$model->getTable()}`.`$myOrder->fieldName` $myOrder->direction";
+            $appliedOrders = true;
         }
 
         return $order;
