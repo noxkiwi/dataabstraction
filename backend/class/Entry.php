@@ -154,7 +154,6 @@ class Entry implements EntryInterface
         }
         $this->changeField($fieldName, $fieldValue);
         $this->data[$fieldName] = $fieldValue;
-        $this->changeField($fieldName, $fieldValue);
     }
 
     /**

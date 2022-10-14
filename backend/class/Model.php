@@ -4,14 +4,15 @@ namespace noxkiwi\dataabstraction;
 use DateTime;
 use Exception;
 use JetBrains\PhpStorm\Pure;
+use JsonException;
 use noxkiwi\cache\Cache;
 use noxkiwi\core\Config;
 use noxkiwi\core\Config\JsonConfig;
 use noxkiwi\core\ErrorHandler;
 use noxkiwi\core\Exception\InvalidArgumentException;
-use noxkiwi\core\Exception\InvalidJsonException;
 use noxkiwi\core\Helper\JsonHelper;
 use noxkiwi\core\Traits\LanguageImprovementTrait;
+use noxkiwi\dataabstraction\Constants\DataType;
 use noxkiwi\dataabstraction\Exception\EntryMissingException;
 use noxkiwi\dataabstraction\Exception\ModelException;
 use noxkiwi\dataabstraction\Interfaces\ModelInterface;
@@ -257,7 +258,7 @@ abstract class Model extends Singleton implements ModelInterface
                     }
                     try {
                         $dataset[$fieldName] = JsonHelper::decodeStringToArray($fieldValue);
-                    } catch (InvalidJsonException) {
+                    } catch (JsonException) {
                         $dataset[$fieldName] = null;
                     }
                     break;
@@ -441,9 +442,8 @@ abstract class Model extends Singleton implements ModelInterface
     {
         $cacheKey = 'manualcache' . hash('sha512', serialize($this->getFilters()));
         if ($this->cache) {
-            $this->result = $this->cacheInstance->get($this->getCacheGroup(), $cacheKey);
-            if (is_array($this->result)) {
-                $result = $this->result;
+            $result = $this->cacheInstance->get($this->getCacheGroup(), $cacheKey);
+            if (is_array($result)) {
                 $this->reset();
                 $this->result = $result;
 
@@ -956,7 +956,7 @@ abstract class Model extends Singleton implements ModelInterface
     {
         $return = $value;
         switch ($this->getFieldType($fieldName)) {
-            case 'boolean':
+            case DataType::BOOLEAN:
                 if ($value === 'true') {
                     $return = true;
                 } elseif ($value === 'false') {
@@ -965,10 +965,10 @@ abstract class Model extends Singleton implements ModelInterface
                     $return = null;
                 }
                 break;
-            case 'number_natural':
+            case DataType::NUMBER_NATURAL:
                 $return = (int)$value;
                 break;
-            case 'text_date':
+            case DataType::DATE:
                 if (empty($value)) {
                     $return = null;
                     break;
@@ -978,11 +978,29 @@ abstract class Model extends Singleton implements ModelInterface
                     $return = $date->format('Y-m-d');
                 }
                 break;
+            case DataType::STRUCTURE:
+                if (is_array($value)) {
+                    break;
+                }
+                $return = JsonHelper::decodeStringToArray($value);
             default:
                 break;
         }
 
         return $return;
+    }
+
+    /**
+     * @return string[]
+     */
+    final public function getReadonlyFields(): array
+    {
+        return [
+            $this->getPrimarykey(),
+            static::TABLE . '_id',
+            static::TABLE . '_modified',
+            static::TABLE . '_created'
+        ];
     }
 
     /**
